@@ -2,6 +2,7 @@ const STORAGE_KEY_ALUMNOS = "uei_san_antonio_portal_v4";
 const STORAGE_KEY_TASA = "uei_san_antonio_tasa_v4";
 
 let alumnos = [];
+let pagosGlobales = [];
 let tasaBCV = typeof TASA_BCV_INICIAL !== "undefined" ? Number(TASA_BCV_INICIAL) : 45.00;
 let alumnoSeleccionado = null;
 let carrito = [];
@@ -37,20 +38,25 @@ function inicializar() {
   if (guardados) {
     try {
       const parsed = JSON.parse(guardados);
-      const listaAlumnos = Array.isArray(parsed)
-        ? parsed
-        : parsed && Array.isArray(parsed.alumnos)
-        ? parsed.alumnos
-        : null;
-
-      alumnos = listaAlumnos
-        ? listaAlumnos.map(normalizarAlumno)
-        : JSON.parse(JSON.stringify(ALUMNOS_INICIALES)).map(normalizarAlumno);
+      if (Array.isArray(parsed)) {
+        alumnos = parsed.map(normalizarAlumno);
+        pagosGlobales = [];
+      } else if (parsed && typeof parsed === "object") {
+        alumnos = Array.isArray(parsed.alumnos)
+          ? parsed.alumnos.map(normalizarAlumno)
+          : JSON.parse(JSON.stringify(ALUMNOS_INICIALES)).map(normalizarAlumno);
+        pagosGlobales = Array.isArray(parsed.pagos) ? parsed.pagos : [];
+      } else {
+        alumnos = JSON.parse(JSON.stringify(ALUMNOS_INICIALES)).map(normalizarAlumno);
+        pagosGlobales = [];
+      }
     } catch (e) {
       alumnos = JSON.parse(JSON.stringify(ALUMNOS_INICIALES)).map(normalizarAlumno);
+      pagosGlobales = [];
     }
   } else {
     alumnos = JSON.parse(JSON.stringify(ALUMNOS_INICIALES)).map(normalizarAlumno);
+    pagosGlobales = [];
     guardarEstado();
   }
 
@@ -70,24 +76,11 @@ function inicializar() {
 }
 
 function guardarEstado() {
-  const payloadActual = localStorage.getItem(STORAGE_KEY_ALUMNOS);
-  let datosAGuardar = alumnos;
-
-  if (payloadActual) {
-    try {
-      const parsed = JSON.parse(payloadActual);
-      if (parsed && !Array.isArray(parsed) && Array.isArray(parsed.alumnos)) {
-        datosAGuardar = {
-          ...parsed,
-          alumnos: alumnos
-        };
-      }
-    } catch (e) {
-      datosAGuardar = alumnos;
-    }
-  }
-
-  localStorage.setItem(STORAGE_KEY_ALUMNOS, JSON.stringify(datosAGuardar));
+  const payload = {
+    alumnos: alumnos,
+    pagos: pagosGlobales
+  };
+  localStorage.setItem(STORAGE_KEY_ALUMNOS, JSON.stringify(payload));
   localStorage.setItem(STORAGE_KEY_TASA, String(tasaBCV));
 }
 
@@ -273,6 +266,21 @@ function limpiarBusqueda() {
 }
 
 function seleccionarAlumno(matricula) {
+  // Relee siempre lo más reciente de localStorage para reflejar aprobaciones o rechazos del panel admin
+  const guardados = localStorage.getItem(STORAGE_KEY_ALUMNOS);
+  if (guardados) {
+    try {
+      const parsed = JSON.parse(guardados);
+      const lista = Array.isArray(parsed) ? parsed : parsed && Array.isArray(parsed.alumnos) ? parsed.alumnos : null;
+      if (lista) {
+        alumnos = lista.map(normalizarAlumno);
+      }
+      if (parsed && !Array.isArray(parsed) && Array.isArray(parsed.pagos)) {
+        pagosGlobales = parsed.pagos;
+      }
+    } catch (e) {}
+  }
+
   alumnoSeleccionado = alumnos.find((a) => a.matricula === matricula);
   if (!alumnoSeleccionado) return;
 
@@ -458,6 +466,7 @@ function toggleSaldoPeriodo(per) {
       id: idClave,
       tipo: "SALDO_PERIODO",
       periodo: per,
+      descripcion: `Saldo Período ${per}`,
       nombre: `Saldo Período ${per}`,
       monto: Number(p.saldo)
     });
@@ -477,6 +486,7 @@ function toggleInscripcion() {
       id: idClave,
       tipo: "INSCRIPCION",
       periodo: "2026-2027",
+      descripcion: "Inscripción 2026-2027",
       nombre: "Inscripción",
       monto: PRECIO_INSCRIPCION
     });
@@ -499,8 +509,10 @@ function toggleMes(mes) {
       id: idClave,
       tipo: "MENSUALIDAD",
       periodo: "2026-2027",
-      nombre: mes,
+      mes: mes,
       mesRaw: mes,
+      descripcion: `Mensualidad ${mes}`,
+      nombre: mes,
       monto: PRECIO_MENSUALIDAD
     });
   }
@@ -592,6 +604,28 @@ function procesarPago() {
     a.matricula === alumnoSeleccionado.matricula ? normalizarAlumno(alumnoSeleccionado) : a
   );
   alumnoSeleccionado = alumnos.find((a) => a.matricula === alumnoSeleccionado.matricula);
+
+  // Registra el pago también en pagosGlobales para que aparezca de inmediato en la bandeja del Panel Administrativo
+  pagosGlobales.unshift({
+    id: codigoComprobante,
+    fecha: new Date().toLocaleDateString("es-VE"),
+    matricula: alumnoSeleccionado.matricula,
+    cedula: alumnoSeleccionado.cedula || "",
+    alumnoNombre: alumnoSeleccionado.nombre,
+    metodo: metodo,
+    referencia: refFinal || "Portal",
+    totalUSD: totalReportado,
+    estado: "En Revisión",
+    conceptos: conceptosReportados.map((c) => ({
+      tipo: c.tipo,
+      periodo: c.periodo || "2026-2027",
+      mes: c.mes || c.mesRaw || "",
+      mesRaw: c.mesRaw || c.mes || "",
+      descripcion: c.descripcion || c.nombre,
+      nombre: c.nombre || c.descripcion,
+      monto: Number(c.monto)
+    }))
+  });
 
   carrito = [];
   if (inputRef) inputRef.value = "";
