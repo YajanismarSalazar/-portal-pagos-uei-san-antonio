@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>U.E.I SAN ANTONIO C.A. — Portal de Pago</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+  <style>
+    :root {
+      font-size: 16px;
+    }
+    body {
+      font-size: 1rem;
+    }
+    .container {
+      max-width: 1280px !important;
+      width: 96% !important;
+    }
+    .card {
+      padding: 24px !important;
+      border-radius: 14px !important;
+    }
+    .card h2 {
+      font-size: 1.5rem !important;
+    }
+    .card h3 {
+      font-size: 1.2rem !important;
+    }
+    .muted,
+    .small,
+    .helper-text {
+      font-size: 0.96rem !important;
+      line-height: 1.45;
+    }
+    input[type="text"],
+    input[type="number"],
+    select {
+      padding: 11px 14px !important;
+      font-size: 0.98rem !important;
+      border-radius: 10px !important;
+    }
+    .btn {
+      padding: 10px 16px !important;
+      font-size: 0.95rem !important;
+      border-radius: 10px !important;
+    }
+    .item-cuota {
+      padding: 15px !important;
+      border-radius: 12px !important;
+    }
+    .titulo-cuota {
+      font-size: 1.02rem !important;
+    }
+    .monto-cuota {
+      font-size: 0.98rem !important;
+    }
+    .tag-estado {
+      font-size: 0.8rem !important;
+      padding: 4px 10px !important;
+    }
+    .status-pill {
+      font-size: 0.94rem !important;
+      padding: 8px 14px !important;
+    }
+    .nivel-tag {
+      font-size: 0.88rem !important;
+      padding: 5px 12px !important;
+    }
+    #alumno-nombre {
+      font-size: 1.45rem !important;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar" style="padding: 20px 0;">
+    <div
+      class="container topbar-inner"
+      style="display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;"
+    >
+      <div class="brand" style="display:flex;align-items:center;gap:16px;min-width:0;">
+        <img
+          src="./logo.jpg"
+          alt="Logo U.E.I SAN ANTONIO C.A."
+          style="width:84px;height:98px;object-fit:contain;background:#ffffff;border-radius:14px;padding:5px;box-shadow:0 6px 16px rgba(0,0,0,0.22);flex-shrink:0;"
+        />
+        <div style="display:flex;flex-direction:column;gap:5px;min-width:0;">
+          <h1 style="margin:0;line-height:1.1;white-space:nowrap;font-size:1.85rem;font-weight:800;letter-spacing:0.02em;">
+            U.E.I SAN ANTONIO C.A.
+          </h1>
+          <div style="font-size:0.92rem;font-weight:600;opacity:0.95;letter-spacing:0.02em;white-space:nowrap;">
+            RIF: J303927017 · Telf: 0424-8912975
+          </div>
+          <span
+            class="brand-badge"
+            style="display:inline-flex;align-items:center;justify-content:center;width:fit-content;max-width:none;white-space:nowrap;padding:6px 15px;margin-top:4px;border-radius:9px;font-size:0.84rem;font-weight:700;letter-spacing:0.06em;box-shadow:0 3px 8px rgba(0,0,0,0.18);"
+          >
+            PORTAL DE PAGO
+          </span>
+        </div>
+      </div>
+
+      <div
+        class="tasa-box"
+        style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-radius:14px;background:rgba(255,255,255,0.12);"
+      >
+        <label for="tasa-bcv-input" style="white-space:nowrap;font-size:0.96rem;font-weight:700;">
+          Tasa BCV (Bs/$):
+        </label>
+        <input
+          type="number"
+          id="tasa-bcv-input"
+          step="0.01"
+          min="0.01"
+          value="45.00"
+          style="width:105px;font-weight:700;"
+        />
+        <button
+          type="button"
+          class="btn btn-light"
+          style="font-weight:700;white-space:nowrap;"
+          onclick="actualizarTasaBCV()"
+        >
+          Aplicar
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline-light"
+          style="font-weight:700;white-space:nowrap;"
+          onclick="consultarTasaBCVOnline()"
+        >
+          Consultar BCV
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container main-content" style="padding-top: 26px; padding-bottom: 40px;">
+    <section id="vista-portal">
+      <div class="card buscador-card">
+        <div class="card-header-flex" style="margin-bottom: 14px;">
+          <div>
+            <h2 style="margin-bottom: 6px;">Consulta de Estado de Cuenta y Pagos</h2>
+            <p class="muted">
+              Busca por número de cédula o matrícula para consultar saldos o mensualidades pendientes.
+            </p>
+          </div>
+        </div>
+
+        <form id="form-busqueda" class="buscador-form" onsubmit="buscarPorCedula(event)" style="gap: 12px;">
+          <input
+            type="text"
+            id="buscador-cedula"
+            placeholder="Ej: V-12345678 o matrícula 1234567"
+            autocomplete="off"
+          />
+          <button type="submit" class="btn btn-primary" style="white-space:nowrap;">
+            Buscar Registro
+          </button>
+          <button type="button" class="btn btn-secondary" style="white-space:nowrap;" onclick="limpiarBusqueda()">
+            Limpiar
+          </button>
+        </form>
+
+        <p id="mensaje-busqueda" class="helper-text" style="margin-top: 12px;"></p>
+      </div>
+
+      <div id="panel-alumno" class="panel-alumno oculto">
+        <div class="card alumno-header">
+          <div>
+            <span id="alumno-nivel" class="nivel-tag"></span>
+            <h3 id="alumno-nombre" style="margin-top: 8px;"></h3>
+            <p id="alumno-meta" class="muted small" style="margin-top: 4px;"></p>
+          </div>
+          <div id="alumno-estado-pill" class="status-pill"></div>
+        </div>
+
+        <div class="grid-cobro" style="gap: 22px;">
+          <div class="col-conceptos">
+            <div class="card">
+              <h3>1. Saldos por Período e Inscripción</h3>
+              <p class="muted small" style="margin-bottom: 14px;">
+                Se muestran únicamente los períodos con saldo pendiente o la inscripción correspondiente.
+              </p>
+              <div id="caja-inscripcion" class="caja-inscripcion"></div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+              <h3>2. Mensualidades Pendientes</h3>
+              <p class="muted small" style="margin-bottom: 14px;">
+                Haz clic en los meses pendientes que deseas incluir en tu pago.
+              </p>
+              <div id="caja-mensualidades" class="grid-meses"></div>
+            </div>
+          </div>
+
+          <aside class="col-resumen">
+            <div class="card resumen-card">
+              <h3>Resumen de Pago</h3>
+              <p class="muted small" style="margin-bottom: 10px;">Conceptos seleccionados:</p>
+
+              <ul id="lista-carrito" class="lista-carrito">
+                <li class="muted small">No has seleccionado conceptos todavía.</li>
+              </ul>
+
+              <hr class="divider" />
+
+              <div class="resumen-fila" style="font-size: 1rem;">
+                <span>Conceptos seleccionados:</span>
+                <strong id="cant-seleccionados">0</strong>
+              </div>
+              <div class="resumen-fila total-usd" style="font-size: 1.15rem;">
+                <span>Total en USD ($):</span>
+                <strong id="total-pagar-usd">$0.00</strong>
+              </div>
+              <div class="resumen-fila total-bs" style="font-size: 1.15rem;">
+                <span>Equivalente BCV (Bs.):</span>
+                <strong id="total-pagar-bs">Bs. 0,00</strong>
+              </div>
+
+              <div class="form-group">
+                <label for="metodo-pago" style="font-size: 0.98rem; font-weight: 600;">Método de pago</label>
+                <select id="metodo-pago" onchange="actualizarInfoMetodoPago()">
+                  <option value="Pago Móvil">Pago Móvil</option>
+                  <option value="Transferencia Bancaria">Transferencia Bancaria</option>
+                  <option value="Efectivo USD ($)">Efectivo USD ($)</option>
+                  <option value="Cashea">Cashea</option>
+                  <option value="Punto de Venta">Punto de Venta</option>
+                </select>
+              </div>
+
+              <div id="info-metodo-pago" class="info-pago-box" style="font-size: 0.96rem;"></div>
+
+              <div id="grupo-referencia" class="form-group">
+                <label id="label-referencia" for="referencia-pago" style="font-size: 0.98rem; font-weight: 600;">
+                  Nro. de Referencia (para conciliación)
+                </label>
+                <input
+                  type="text"
+                  id="referencia-pago"
+                  placeholder="Ej: 00984512"
+                  autocomplete="off"
+                />
+              </div>
+
+              <button type="button" class="btn btn-primary btn-block" style="padding: 13px 20px !important; font-size: 1.05rem !important;" onclick="procesarPago()">
+                Registrar Pago
+              </button>
+
+              <div id="mensaje-pago" class="alerta-exito oculto"></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="modal-recibo" class="modal-backdrop oculto">
+    <div class="modal-card" style="max-width: 560px; padding: 26px;">
+      <div class="modal-header">
+        <h3>Comprobante de Pago — U.E.I SAN ANTONIO C.A.</h3>
+        <button type="button" class="btn-close no-print" onclick="cerrarRecibo()">✕</button>
+      </div>
+      <div id="detalle-recibo" class="recibo-body"></div>
+      <div class="modal-actions no-print">
+        <button type="button" class="btn btn-primary" onclick="enviarComprobanteWhatsApp()">
+          Enviar por WhatsApp
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="window.print()">Imprimir</button>
+        <button type="button" class="btn btn-primary" onclick="cerrarRecibo()">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/data.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
