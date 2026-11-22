@@ -31,35 +31,41 @@ function normalizarAlumno(a) {
   };
 }
 
-function inicializar() {
+function sincronizarDesdeStorage() {
   const guardados = localStorage.getItem(STORAGE_KEY_ALUMNOS);
-  const tasaGuardada = localStorage.getItem(STORAGE_KEY_TASA);
+  if (!guardados) return false;
 
-  if (guardados) {
-    try {
-      const parsed = JSON.parse(guardados);
-      if (Array.isArray(parsed)) {
-        alumnos = parsed.map(normalizarAlumno);
-        pagosGlobales = [];
-      } else if (parsed && typeof parsed === "object") {
-        alumnos = Array.isArray(parsed.alumnos)
-          ? parsed.alumnos.map(normalizarAlumno)
-          : JSON.parse(JSON.stringify(ALUMNOS_INICIALES)).map(normalizarAlumno);
-        pagosGlobales = Array.isArray(parsed.pagos) ? parsed.pagos : [];
-      } else {
-        alumnos = JSON.parse(JSON.stringify(ALUMNOS_INICIALES)).map(normalizarAlumno);
-        pagosGlobales = [];
-      }
-    } catch (e) {
-      alumnos = JSON.parse(JSON.stringify(ALUMNOS_INICIALES)).map(normalizarAlumno);
+  try {
+    const parsed = JSON.parse(guardados);
+    if (Array.isArray(parsed)) {
+      alumnos = parsed.map(normalizarAlumno);
       pagosGlobales = [];
+      return true;
     }
-  } else {
+    if (parsed && typeof parsed === "object") {
+      if (Array.isArray(parsed.alumnos) && parsed.alumnos.length) {
+        alumnos = parsed.alumnos.map(normalizarAlumno);
+      }
+      if (Array.isArray(parsed.pagos)) {
+        pagosGlobales = parsed.pagos;
+      }
+      return true;
+    }
+  } catch (e) {
+    console.warn("Error sincronizando portal desde localStorage:", e);
+  }
+  return false;
+}
+
+function inicializar() {
+  const ok = sincronizarDesdeStorage();
+  if (!ok) {
     alumnos = JSON.parse(JSON.stringify(ALUMNOS_INICIALES)).map(normalizarAlumno);
     pagosGlobales = [];
     guardarEstado();
   }
 
+  const tasaGuardada = localStorage.getItem(STORAGE_KEY_TASA);
   tasaBCV = tasaGuardada && Number(tasaGuardada) > 0
     ? Number(tasaGuardada)
     : (typeof TASA_BCV_INICIAL !== "undefined" ? Number(TASA_BCV_INICIAL) : 45.00);
@@ -73,6 +79,19 @@ function inicializar() {
   }
 
   actualizarInfoMetodoPago();
+
+  // Escucha cambios hechos desde el Panel Administrativo en otra pestaña
+  window.addEventListener("storage", (e) => {
+    if (e.key === STORAGE_KEY_ALUMNOS && alumnoSeleccionado) {
+      const matActual = alumnoSeleccionado.matricula;
+      sincronizarDesdeStorage();
+      alumnoSeleccionado = alumnos.find((a) => a.matricula === matActual) || null;
+      if (alumnoSeleccionado) {
+        renderizarPanelAlumno();
+        renderizarCarrito();
+      }
+    }
+  });
 }
 
 function guardarEstado() {
@@ -219,6 +238,8 @@ function obtenerEstadoAlumno(alumno) {
 
 function buscarPorCedula(e) {
   if (e) e.preventDefault();
+  sincronizarDesdeStorage();
+
   const inputBuscador = document.getElementById("buscador-cedula");
   const panel = document.getElementById("panel-alumno");
   const msg = document.getElementById("mensaje-busqueda");
@@ -266,20 +287,7 @@ function limpiarBusqueda() {
 }
 
 function seleccionarAlumno(matricula) {
-  // Relee siempre lo más reciente de localStorage para reflejar aprobaciones o rechazos del panel admin
-  const guardados = localStorage.getItem(STORAGE_KEY_ALUMNOS);
-  if (guardados) {
-    try {
-      const parsed = JSON.parse(guardados);
-      const lista = Array.isArray(parsed) ? parsed : parsed && Array.isArray(parsed.alumnos) ? parsed.alumnos : null;
-      if (lista) {
-        alumnos = lista.map(normalizarAlumno);
-      }
-      if (parsed && !Array.isArray(parsed) && Array.isArray(parsed.pagos)) {
-        pagosGlobales = parsed.pagos;
-      }
-    } catch (e) {}
-  }
+  sincronizarDesdeStorage();
 
   alumnoSeleccionado = alumnos.find((a) => a.matricula === matricula);
   if (!alumnoSeleccionado) return;
@@ -292,6 +300,89 @@ function seleccionarAlumno(matricula) {
 
   renderizarPanelAlumno();
   renderizarCarrito();
+}
+
+function renderizarHistorialRepresentante(matricula) {
+  const panelAlumno = document.getElementById("panel-alumno");
+  if (!panelAlumno) return;
+
+  let histBox = document.getElementById("historial-pagos-representante");
+  if (!histBox) {
+    histBox = document.createElement("div");
+    histBox.id = "historial-pagos-representante";
+    histBox.style.cssText =
+      "margin-top:20px;padding:16px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;";
+    panelAlumno.appendChild(histBox);
+  }
+
+  const pagosAlumno = pagosGlobales.filter((p) => String(p.matricula) === String(matricula));
+  const rechazados = pagosAlumno.filter((p) => p.estado === "Rechazado");
+
+  let avisoRechazoHtml = "";
+  if (rechazados.length > 0) {
+    const ultRech = rechazados[0];
+    avisoRechazoHtml = `
+      <div style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:0.9rem;">
+        <strong>Aviso de Administración — Pago Rechazado (${ultRech.id}):</strong>
+        ${ultRech.fechaConciliacion || "Observación no especificada"}. Los conceptos rechazados quedaron disponibles para reportar nuevamente.
+      </div>
+    `;
+  }
+
+  if (!pagosAlumno.length) {
+    histBox.innerHTML = `
+      <strong style="color:#1e3a8a;display:block;margin-bottom:6px;">Estado de Pagos Reportados</strong>
+      <p class="muted small" style="margin:0;">Aún no hay movimientos registrados para este estudiante.</p>
+    `;
+    return;
+  }
+
+  const filasHtml = pagosAlumno
+    .slice(0, 6)
+    .map((p) => {
+      let colorBg = "#fff7ed";
+      let colorTxt = "#9a3412";
+      let etiqueta = "EN REVISIÓN";
+      if (p.estado === "Confirmado") {
+        colorBg = "#dcfce7";
+        colorTxt = "#166534";
+        etiqueta = "APROBADO / CONFIRMADO";
+      } else if (p.estado === "Rechazado") {
+        colorBg = "#fee2e2";
+        colorTxt = "#991b1b";
+        etiqueta = "RECHAZADO";
+      }
+
+      const conceptosTxt = Array.isArray(p.conceptos)
+        ? p.conceptos.map((c) => c.descripcion || c.nombre || c).join(", ")
+        : "Pago";
+
+      const detalleEstado =
+        p.estado === "Rechazado" && p.fechaConciliacion
+          ? `<div class="muted small" style="margin-top:2px;">Motivo: ${p.fechaConciliacion}</div>`
+          : "";
+
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;">
+          <div>
+            <strong>${p.id}</strong> · <span class="muted small">${p.fecha}</span> · <span class="small">${p.metodo}</span>
+            <div class="small" style="color:#334155;">${conceptosTxt}</div>
+            ${detalleEstado}
+          </div>
+          <div style="text-align:right;">
+            <strong>$${Number(p.totalUSD || 0).toFixed(2)}</strong>
+            <div><span style="display:inline-block;padding:3px 9px;border-radius:999px;font-size:0.75rem;font-weight:700;background:${colorBg};color:${colorTxt};">${etiqueta}</span></div>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  histBox.innerHTML = `
+    ${avisoRechazoHtml}
+    <strong style="color:#1e3a8a;display:block;margin-bottom:6px;">Historial y Respuesta de Administración</strong>
+    <div>${filasHtml}</div>
+  `;
 }
 
 function renderizarPanelAlumno() {
@@ -411,6 +502,7 @@ function renderizarPanelAlumno() {
 
   if (!esAlumnoRegular2627) {
     cajaMeses.innerHTML = `<div class="muted small">No aplica mensualidades vigentes en este registro.</div>`;
+    renderizarHistorialRepresentante(a.matricula);
     return;
   }
 
@@ -450,6 +542,8 @@ function renderizarPanelAlumno() {
       </div>
     `;
   }).join("");
+
+  renderizarHistorialRepresentante(a.matricula);
 }
 
 function toggleSaldoPeriodo(per) {
@@ -605,7 +699,6 @@ function procesarPago() {
   );
   alumnoSeleccionado = alumnos.find((a) => a.matricula === alumnoSeleccionado.matricula);
 
-  // Registra el pago también en pagosGlobales para que aparezca de inmediato en la bandeja del Panel Administrativo
   pagosGlobales.unshift({
     id: codigoComprobante,
     fecha: new Date().toLocaleDateString("es-VE"),
