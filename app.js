@@ -80,7 +80,6 @@ function inicializar() {
 
   actualizarInfoMetodoPago();
 
-  // Escucha cambios hechos desde el Panel Administrativo en otra pestaña
   window.addEventListener("storage", (e) => {
     if (e.key === STORAGE_KEY_ALUMNOS && alumnoSeleccionado) {
       const matActual = alumnoSeleccionado.matricula;
@@ -699,6 +698,9 @@ function procesarPago() {
   );
   alumnoSeleccionado = alumnos.find((a) => a.matricula === alumnoSeleccionado.matricula);
 
+  // Asegura que los pagos demo iniciales también estén presentes si el arreglo estaba vacío
+  if (!Array.isArray(pagosGlobales)) pagosGlobales = [];
+
   pagosGlobales.unshift({
     id: codigoComprobante,
     fecha: new Date().toLocaleDateString("es-VE"),
@@ -706,9 +708,10 @@ function procesarPago() {
     cedula: alumnoSeleccionado.cedula || "",
     alumnoNombre: alumnoSeleccionado.nombre,
     metodo: metodo,
-    referencia: refFinal || "Portal",
+    referencia: refFinal || "Portal / WhatsApp",
     totalUSD: totalReportado,
     estado: "En Revisión",
+    canal: "WhatsApp / Portal",
     conceptos: conceptosReportados.map((c) => ({
       tipo: c.tipo,
       periodo: c.periodo || "2026-2027",
